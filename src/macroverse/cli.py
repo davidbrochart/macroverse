@@ -5,8 +5,10 @@ from .main import MacroverseModule
 
 app = App()
 
+
 @app.default
 def main():
+    """Jupyverse deployment."""
     macroverse_module = MacroverseModule()
     macroverse_module.run()
 
