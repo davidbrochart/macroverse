@@ -1,6 +1,6 @@
 from cyclopts import App
 
-from .main import MacroverseModule
+from .main import ContainerType, MacroverseModule
 
 
 app = App()
@@ -8,14 +8,16 @@ app = App()
 
 @app.default
 def main(
-    open_browser: bool = True,
+    container: ContainerType = "process",
+    open_browser: bool = False,
 ) -> None:
     """Jupyverse deployment.
 
     Args:
+        container: The type of container to use for launching servers.
         open_browser: Whether to automatically open a browser window.
     """
-    macroverse_module = MacroverseModule(open_browser)
+    macroverse_module = MacroverseModule(container, open_browser)
     macroverse_module.run()
 
 
