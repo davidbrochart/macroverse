@@ -11,7 +11,7 @@ from jupyverse_api.lab import PageConfig
 from fastapi import FastAPI
 from structlog import get_logger
 
-from .hub import Hub
+from .hub import ContainerType, Hub
 from .utils import get_unused_tcp_ports
 
 
@@ -19,8 +19,13 @@ logger = get_logger()
 
 
 class MacroverseModule(Module):
-    def __init__(self, open_browser: bool):
+    def __init__(
+        self,
+        container: ContainerType,
+        open_browser: bool,
+    ):
         super().__init__("macroverse", start_timeout=10)
+        self.container = container
         self.open_browser = open_browser
         self.host = "localhost"
         self.nginx_port, self.macroverse_port = get_unused_tcp_ports(2)
@@ -36,7 +41,7 @@ class MacroverseModule(Module):
         async with create_task_group() as tg:
             root_app = await self.get(FastAPI)
             macroverse_app = FastAPI()
-            self.hub = Hub(tg, self.nginx_port, self.macroverse_port)
+            self.hub = Hub(tg, self.nginx_port, self.macroverse_port, self.container)
 
             App(app=macroverse_app)
             root_app.mount("/macroverse", macroverse_app)

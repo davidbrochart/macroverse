@@ -2,7 +2,7 @@ import os
 import signal
 import sys
 import shutil
-from typing import Any
+from typing import Any, Literal
 from uuid import uuid4
 
 import anyio
@@ -25,16 +25,22 @@ from pydantic import BaseModel, Field, UUID4
 from .utils import get_unused_tcp_ports
 
 
+ContainerType = Literal["process", "docker"]
 logger = structlog.get_logger()
 
 
 class Hub:
     def __init__(
-        self, task_group: TaskGroup, nginx_port: int, macroverse_port: int
+        self,
+        task_group: TaskGroup,
+        nginx_port: int,
+        macroverse_port: int,
+        container: ContainerType,
     ) -> None:
         self.task_group = task_group
         self.nginx_port = nginx_port
         self.macroverse_port = macroverse_port
+        self.container = container
         self.lock = Lock()
         self.environments: dict[str, Environment] = {}
         self.nginx_conf_path = (
@@ -46,7 +52,13 @@ class Hub:
         env_dir = anyio.Path("environments")
         if await env_dir.is_dir():
             async for env_path in env_dir.iterdir():
-                self.environments[env_path.name] = Environment()
+                if self.container == "process":
+                    environment = Environment()
+                elif self.container == "docker":
+                    dockerfile = await (env_path / "Dockerfile").read_text()
+                    environment_id = dockerfile.splitlines()[-1][2:]
+                    environment = Environment(id=environment_id)
+                self.environments[env_path.name] = environment
         await self.write_nginx_conf()
         logger.info("Starting nginx")
         self.nginx_process = await open_process("nginx")
@@ -68,7 +80,7 @@ class Hub:
         )
         self.task_group.start_soon(self._create_environment, environment, _environment)
 
-    async def _run_time(self, environment: "Environment") -> None:
+    async def _creation_timer(self, environment: "Environment") -> None:
         while True:
             await sleep(1)
             assert environment.create_time is not None
@@ -78,7 +90,7 @@ class Hub:
         self, environment_yaml: dict[str, Any], environment: "Environment"
     ) -> None:
         async with create_task_group() as tg:
-            tg.start_soon(self._run_time, environment)
+            tg.start_soon(self._creation_timer, environment)
             server_env_path = anyio.Path("environments") / environment_yaml["name"]
             if not await server_env_path.exists():
                 environment_yaml["dependencies"].extend(
@@ -93,29 +105,49 @@ class Hub:
                         "fps-frontend",
                     ]
                 )
+                if self.container == "docker":
+                    environment_yaml["name"] = "base"
                 environment_str = yaml.dump(environment_yaml, Dumper=yaml.CDumper)
-                async with NamedTemporaryFile(
-                    mode="wb", buffering=0, delete=True, suffix=".yaml"
-                ) as f:
-                    await f.write(environment_str.encode())
-                    create_environment_cmd = (
-                        f"micromamba create -f {f.name} -p {server_env_path} --yes"
+                if self.container == "process":
+                    async with NamedTemporaryFile(
+                        mode="wb", buffering=0, suffix=".yaml"
+                    ) as environment_file:
+                        await environment_file.write(environment_str.encode())
+                        create_environment_cmd = f"micromamba create -f {environment_file.name} -p {server_env_path} --yes"
+                        await run_process(create_environment_cmd)
+                elif self.container == "docker":
+                    await server_env_path.mkdir(parents=True)
+                    await (server_env_path / "environment.yaml").write_text(
+                        environment_str
                     )
-                    await run_process(create_environment_cmd)
-                    environment.create_time = None
-                    tg.cancel_scope.cancel()
+                    dockerfile_str = DOCKERFILE.replace(
+                        "ENVIRONMENT_PATH", "environment.yaml"
+                    ).replace("ENVIRONMENT_ID", str(environment.id))
+                    await (server_env_path / "Dockerfile").write_text(dockerfile_str)
+                    build_docker_image_cmd = (
+                        f"docker build --tag {environment.id} {server_env_path}"
+                    )
+                    await run_process(build_docker_image_cmd, stdout=None, stderr=None)
+                environment.create_time = None
+                tg.cancel_scope.cancel()
 
     async def start_server(self, env_name):
-        port = get_unused_tcp_ports(1)[0]
         environment = self.environments[env_name]
-        launch_jupyverse_cmd = f"jupyverse --port {port} --set frontend.base_url=/jupyverse/{environment.id}/"
-        cmd = (
-            """bash -c 'eval "$(micromamba shell hook --shell bash)";"""
-            + f"micromamba activate environments/{env_name};"
-            + f"{launch_jupyverse_cmd}'"
+        port = get_unused_tcp_ports(1)[0]
+        if self.container == "process":
+            launch_jupyverse_cmd = f"jupyverse --port {port} --set frontend.base_url=/jupyverse/{environment.id}/"
+            cmd = (
+                """bash -c 'eval "$(micromamba shell hook --shell bash)";"""
+                + f"micromamba activate environments/{env_name};"
+                + f"{launch_jupyverse_cmd}'"
+            )
+        elif self.container == "docker":
+            launch_jupyverse_cmd = f"jupyverse --host 0.0.0.0 --port 5000 --set frontend.base_url=/jupyverse/{environment.id}/"
+            cmd = f"docker run -p {port}:5000 {environment.id} {launch_jupyverse_cmd}"
+        process = await open_process(cmd, stdout=None, stderr=None)
+        environment.port = (
+            port  # port must be set before writing NGINX conf, but not process!
         )
-        environment.process = await open_process(cmd, stdout=None, stderr=None)
-        environment.port = port
         await self.write_nginx_conf()
         await run_process("nginx -s reload")
         async with httpx.AsyncClient() as client:
@@ -123,10 +155,11 @@ class Hub:
                 await sleep(0.1)
                 try:
                     await client.get(f"http://127.0.0.1:{port}")
-                except httpx.ConnectError:
+                except Exception:
                     pass
                 else:
-                    return
+                    break
+        environment.process = process
 
     async def stop_server(self, env_name: str) -> None:
         environment = self.environments[env_name]
@@ -154,7 +187,7 @@ class Hub:
                 "MACROVERSE_PORT", str(self.macroverse_port)
             )
             for name, environment in self.environments.items():
-                if environment.process is not None:
+                if environment.port is not None:
                     nginx_kernel_conf = (
                         NGINX_KERNEL_CONF.replace(
                             "KERNEL_SERVER_PORT", str(environment.port)
@@ -169,7 +202,7 @@ class Hub:
 
 
 class Environment(BaseModel):
-    id: UUID4 = Field(default_factory=uuid4)
+    id: UUID4 | str = Field(default_factory=uuid4)
     port: int | None = None
     process: Process | None = None
     create_time: int | None = None
@@ -178,7 +211,7 @@ class Environment(BaseModel):
         arbitrary_types_allowed = True
 
 
-NGINX_CONF = """
+NGINX_CONF = """\
 map $http_upgrade $connection_upgrade {
     default upgrade;
     ''      close;
@@ -249,4 +282,15 @@ NGINX_KERNEL_CONF = """
     }
 
 # NGINX_KERNEL_CONF
+"""
+
+
+DOCKERFILE = """\
+FROM mambaorg/micromamba:2.4.0
+
+COPY --chown=$MAMBA_USER:$MAMBA_USER ENVIRONMENT_PATH /tmp/env.yaml
+RUN micromamba install -y -n base -f /tmp/env.yaml &&  micromamba clean --all --yes
+ARG MAMBA_DOCKERFILE_ACTIVATE=1
+EXPOSE 5000
+# ENVIRONMENT_ID
 """
