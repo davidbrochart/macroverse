@@ -9,14 +9,19 @@ from fps import Context, Module, get_nowait, get_root_module, put
 from holm import App
 from jupyverse_api.lab import PageConfig
 from fastapi import FastAPI
+from structlog import get_logger
 
 from .hub import Hub
 from .utils import get_unused_tcp_ports
 
 
+logger = get_logger()
+
+
 class MacroverseModule(Module):
-    def __init__(self):
+    def __init__(self, open_browser: bool):
         super().__init__("macroverse", start_timeout=10)
+        self.open_browser = open_browser
         self.host = "localhost"
         self.nginx_port, self.macroverse_port = get_unused_tcp_ports(2)
         self.add_module("fps.web.fastapi:FastAPIModule", "fastapi")
@@ -85,7 +90,9 @@ class MacroverseModule(Module):
             tg.start_soon(super().start)
             await self.modules["server"].started.wait()
             url = f"http://{self.host}:{self.nginx_port}"
-            webbrowser.open_new_tab(url)
+            logger.info("Macroverse running", url=url)
+            if self.open_browser:
+                webbrowser.open_new_tab(url)
 
     async def _run_jupyverse(
         self,
@@ -104,11 +111,11 @@ class MacroverseModule(Module):
 
 async def hook(config: dict[str, Any]) -> None:
     with get_nowait(Request) as request:
-        uuid = request.headers["x-replaced-path"]
+        uuid = request.headers["x-environment-id"]
         jupyverse_len = len("/jupyverse")
         for key, val in config.items():
             if isinstance(val, str) and val.startswith("/jupyverse"):
-                config[key] = f"/jupyverse/main/{uuid}" + val[jupyverse_len:]
+                config[key] = f"/jupyverse/{uuid}" + val[jupyverse_len:]
 
 
 class PageConfigHookModule(Module):

@@ -1,6 +1,7 @@
 import os
 import signal
 import sys
+from typing import Any
 from uuid import uuid4
 
 import anyio
@@ -60,35 +61,52 @@ class Hub:
 
     async def create_environment(self, environment_yaml: str) -> None:
         environment = yaml.load(environment_yaml, Loader=yaml.CLoader)
-        server_env_path = anyio.Path("environments") / environment["name"]
-        if not await server_env_path.exists():
-            environment["dependencies"].extend(
-                [
-                    "rich-click",
-                    "anycorn",
-                    "jupyverse-api",
-                    "fps-file-watcher",
-                    "fps-kernels",
-                    "fps-kernel-subprocess",
-                    "fps-noauth",
-                    "fps-frontend",
-                ]
-            )
-            environment_yaml = yaml.dump(environment, Dumper=yaml.CDumper)
-            async with NamedTemporaryFile(
-                mode="wb", buffering=0, delete=True, suffix=".yaml"
-            ) as f:
-                await f.write(environment_yaml.encode())
-                create_environment_cmd = (
-                    f"micromamba create -f {f.name} -p {server_env_path} --yes"
+        self.environments[environment["name"]] = _environment = Environment(
+            create_time=0
+        )
+        self.task_group.start_soon(self._create_environment, environment, _environment)
+
+    async def _run_time(self, environment: "Environment") -> None:
+        while True:
+            await sleep(1)
+            assert environment.create_time is not None
+            environment.create_time += 1
+
+    async def _create_environment(
+        self, environment_yaml: dict[str, Any], environment: "Environment"
+    ) -> None:
+        async with create_task_group() as tg:
+            tg.start_soon(self._run_time, environment)
+            server_env_path = anyio.Path("environments") / environment_yaml["name"]
+            if not await server_env_path.exists():
+                environment_yaml["dependencies"].extend(
+                    [
+                        "rich-click",
+                        "anycorn",
+                        "jupyverse-api",
+                        "fps-file-watcher",
+                        "fps-kernels",
+                        "fps-kernel-subprocess",
+                        "fps-noauth",
+                        "fps-frontend",
+                    ]
                 )
-                await run_process(create_environment_cmd)
-            self.environments[environment["name"]] = Environment()
+                environment_str = yaml.dump(environment_yaml, Dumper=yaml.CDumper)
+                async with NamedTemporaryFile(
+                    mode="wb", buffering=0, delete=True, suffix=".yaml"
+                ) as f:
+                    await f.write(environment_str.encode())
+                    create_environment_cmd = (
+                        f"micromamba create -f {f.name} -p {server_env_path} --yes"
+                    )
+                    await run_process(create_environment_cmd)
+                    environment.create_time = None
+                    tg.cancel_scope.cancel()
 
     async def start_server(self, env_name):
         port = get_unused_tcp_ports(1)[0]
         environment = self.environments[env_name]
-        launch_jupyverse_cmd = f"jupyverse --port {port} --set frontend.base_url=/jupyverse/main/{environment.id}/"
+        launch_jupyverse_cmd = f"jupyverse --port {port} --set frontend.base_url=/jupyverse/{environment.id}/"
         cmd = (
             """bash -c 'eval "$(micromamba shell hook --shell bash)";"""
             + f"micromamba activate environments/{env_name};"
@@ -145,6 +163,7 @@ class Environment(BaseModel):
     id: UUID4 = Field(default_factory=uuid4)
     port: int | None = None
     process: Process | None = None
+    create_time: int | None = None
 
     class Config:
         arbitrary_types_allowed = True
@@ -169,14 +188,7 @@ server {
 
     location /macroverse {
         proxy_pass http://localhost:MACROVERSE_PORT;
-    }
-
-    location /jupyverse/init {
-        rewrite ^/jupyverse/init/(.*)$ /jupyverse/lab break;
-        proxy_pass http://localhost:MACROVERSE_PORT;
-        proxy_set_header Host $host:$server_port;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Replaced-Path $1;
+        proxy_set_header Cache-Control "no-cache, no-store, must-revalidate";
     }
 
     # jupyverse kernel servers
@@ -187,25 +199,27 @@ server {
 
 
 NGINX_KERNEL_CONF = """
-    location /jupyverse/main/UUID {
-        rewrite ^/jupyverse/main/UUID/(.*)$ /jupyverse/$1 break;
+    location /jupyverse/UUID {
+        rewrite ^/jupyverse/UUID/(.*)$ /jupyverse/$1 break;
+        rewrite /jupyverse/UUID /jupyverse/lab break;
         proxy_pass http://localhost:MACROVERSE_PORT;
+        proxy_set_header X-Environment-ID UUID;
     }
-    location /jupyverse/main/UUID/kernelspecs {
-        rewrite ^/jupyverse/main/UUID/kernelspecs/(.*)$ /kernelspecs/$1 break;
+    location /jupyverse/UUID/kernelspecs {
+        rewrite ^/jupyverse/UUID/kernelspecs/(.*)$ /kernelspecs/$1 break;
         proxy_pass http://localhost:KERNEL_SERVER_PORT;
     }
-    location /jupyverse/main/UUID/api/kernelspecs {
-        rewrite /jupyverse/main/UUID/api/kernelspecs /api/kernelspecs break;
+    location /jupyverse/UUID/api/kernelspecs {
+        rewrite /jupyverse/UUID/api/kernelspecs /api/kernelspecs break;
         proxy_pass http://localhost:KERNEL_SERVER_PORT;
     }
-    location /jupyverse/main/UUID/api/kernels {
-        rewrite /jupyverse/main/UUID/api/kernels /api/kernels break;
+    location /jupyverse/UUID/api/kernels {
+        rewrite /jupyverse/UUID/api/kernels /api/kernels break;
         proxy_pass http://localhost:KERNEL_SERVER_PORT;
     }
-    location ~ ^/jupyverse/main/UUID/api/kernels/(.*)$ {
+    location ~ ^/jupyverse/UUID/api/kernels/(.*)$ {
         if ($http_upgrade != "websocket") {
-            rewrite ^/jupyverse/main/UUID/api/kernels/(.*)$ /api/kernels/$1 break;
+            rewrite ^/jupyverse/UUID/api/kernels/(.*)$ /api/kernels/$1 break;
             proxy_pass http://localhost:KERNEL_SERVER_PORT;
             break;
         }
@@ -213,15 +227,15 @@ NGINX_KERNEL_CONF = """
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection $connection_upgrade;
         proxy_set_header Host $host;
-        rewrite ^/jupyverse/main/UUID/api/kernels/(.*)$ /api/kernels/$1 break;
+        rewrite ^/jupyverse/UUID/api/kernels/(.*)$ /api/kernels/$1 break;
         proxy_pass http://localhost:KERNEL_SERVER_PORT;
     }
-    location /jupyverse/main/UUID/api/sessions {
-        rewrite /jupyverse/main/UUID/api/sessions /api/sessions break;
+    location /jupyverse/UUID/api/sessions {
+        rewrite /jupyverse/UUID/api/sessions /api/sessions break;
         proxy_pass http://localhost:KERNEL_SERVER_PORT;
     }
-    location ~ ^/jupyverse/main/UUID/api/sessions/(.*)$ {
-        rewrite ^/jupyverse/main/UUID/api/sessions/(.*)$ /api/sessions/$1 break;
+    location ~ ^/jupyverse/UUID/api/sessions/(.*)$ {
+        rewrite ^/jupyverse/UUID/api/sessions/(.*)$ /api/sessions/$1 break;
         proxy_pass http://localhost:KERNEL_SERVER_PORT;
     }
 
