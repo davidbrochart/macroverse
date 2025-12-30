@@ -7,9 +7,15 @@ app = App()
 
 
 @app.default
-def main():
-    """Jupyverse deployment."""
-    macroverse_module = MacroverseModule()
+def main(
+    open_browser: bool = True,
+) -> None:
+    """Jupyverse deployment.
+
+    Args:
+        open_browser: Whether to automatically open a browser window.
+    """
+    macroverse_module = MacroverseModule(open_browser)
     macroverse_module.run()
 
 

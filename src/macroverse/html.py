@@ -1,10 +1,10 @@
 from fps import get_nowait
-from htmy import Component, Context, html
+from htmy import ComponentType, html
 
 from .hub import Hub
 
 
-def get_environments() -> Component:
+def get_environments() -> ComponentType:
     with get_nowait(Hub) as hub:
         return html.table(
             html.tbody(*[get_environment(name) for name in hub.environments]),
@@ -12,29 +12,33 @@ def get_environments() -> Component:
         )
 
 
-def get_environment(name: str) -> Component:
+def get_environment(name: str) -> ComponentType:
     with get_nowait(Hub) as hub:
         environment = hub.environments[name]
-        start_server = environment.process is None
+        if environment.create_time is None:
+            if environment.process:
+                button = stop_server_button(name)
+            else:
+                button = start_server_button(name)
+        else:
+            button = creating_button(name)
         return html.tr(
             html.td(
-                html.a(
+                name
+                if environment.create_time is not None or environment.process is None
+                else html.a(
                     name,
                     target="_blank",
                     rel="noopener noreferrer",
-                    href=f"/jupyverse/init/{environment.id}",
+                    href=f"/jupyverse/{environment.id}",
                 )
-                if not start_server
-                else name,
             ),
-            html.td(
-                start_server_button(name) if start_server else stop_server_button(name),
-            ),
-            id=f"environment_{name}" if start_server else f"environment_{name}",
+            html.td(button),
+            id=f"environment_{name}",
         )
 
 
-def start_server_button(name: str) -> Component:
+def start_server_button(name: str) -> ComponentType:
     return html.button(
         "Start server",
         hx_put=f"/macroverse/environment/{name}/create",
@@ -43,7 +47,7 @@ def start_server_button(name: str) -> Component:
     )
 
 
-def stop_server_button(name: str) -> Component:
+def stop_server_button(name: str) -> ComponentType:
     return html.button(
         "Stop server",
         style="background:red",
@@ -53,7 +57,21 @@ def stop_server_button(name: str) -> Component:
     )
 
 
-def create_button() -> Component:
+def creating_button(name: str) -> ComponentType:
+    with get_nowait(Hub) as hub:
+        environment = hub.environments[name]
+        if environment.create_time is None:
+            return start_server_button(name)
+        else:
+            return html.div(
+                f"Creating ({environment.create_time}s)",
+                hx_get=f"/macroverse/environment/{name}/status",
+                hx_trigger="load delay:1s",
+                hx_swap="outerHTML",
+            )
+
+
+def create_button() -> ComponentType:
     return html.button(
         "New environment",
         hx_swap="outerHTML",
@@ -61,7 +79,7 @@ def create_button() -> Component:
     )
 
 
-def get_environments_and_create_button() -> Component:
+def get_environments_and_create_button() -> ComponentType:
     return html.div(
         get_environments(),
         create_button(),

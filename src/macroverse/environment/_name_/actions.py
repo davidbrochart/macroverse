@@ -1,10 +1,15 @@
 from fps import get_nowait
-from htmy import Component, html
+from htmy import Component, ComponentType
 from holm import action
 
 
-from ...html import get_environment
+from ...html import creating_button, get_environment
 from ...hub import Hub
+
+
+@action.get()
+async def status(name: str) -> ComponentType:
+    return creating_button(name)
 
 
 @action.put()

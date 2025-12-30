@@ -10,7 +10,7 @@ from ..hub import Hub
 
 
 @action.get()
-def edit() -> Component:
+async def edit() -> Component:
     return html.form(
         html.div(
             html.label("Environment YAML"),
@@ -32,7 +32,7 @@ def edit() -> Component:
 
 
 @action.get()
-def cancel() -> Component:
+async def cancel() -> Component:
     return get_environments_and_create_button()
 
 
