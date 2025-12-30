@@ -15,14 +15,7 @@ def get_environments() -> ComponentType:
 def get_environment(name: str) -> ComponentType:
     with get_nowait(Hub) as hub:
         environment = hub.environments[name]
-        if environment.create_time is None:
-            if environment.process:
-                button = stop_server_button(name)
-            else:
-                button = start_server_button(name)
-        else:
-            button = creating_button(name)
-        return html.tr(
+        elements = [
             html.td(
                 name
                 if environment.create_time is not None or environment.process is None
@@ -32,8 +25,32 @@ def get_environment(name: str) -> ComponentType:
                     rel="noopener noreferrer",
                     href=f"/jupyverse/{environment.id}",
                 )
-            ),
-            html.td(button),
+            )
+        ]
+        add_delete_button = True
+        if environment.create_time is None:
+            if environment.process:
+                button = stop_server_button(name)
+            else:
+                button = start_server_button(name)
+        else:
+            button = creating_button(name)
+            add_delete_button = False
+        elements.append(html.td(button))
+        if add_delete_button:
+            elements.append(
+                html.td(
+                    html.button(
+                        "Delete environment",
+                        hx_delete=f"/macroverse/environment/{name}/delete-environment",
+                        hx_swap="outerHTML",
+                        hx_target="#environments",
+                        style="background:red",
+                    )
+                )
+            )
+        return html.tr(
+            *elements,
             id=f"environment_{name}",
         )
 
@@ -68,6 +85,7 @@ def creating_button(name: str) -> ComponentType:
                 hx_get=f"/macroverse/environment/{name}/status",
                 hx_trigger="load delay:1s",
                 hx_swap="outerHTML",
+                hx_target=f"#environment_{name}",
             )
 
 
