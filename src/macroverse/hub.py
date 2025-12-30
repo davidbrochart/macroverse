@@ -1,6 +1,7 @@
 import os
 import signal
 import sys
+import shutil
 from typing import Any
 from uuid import uuid4
 
@@ -16,6 +17,7 @@ from anyio import (
     open_process,
     run_process,
     sleep,
+    to_thread,
 )
 from anyio.abc import Process, TaskGroup
 from pydantic import BaseModel, Field, UUID4
@@ -138,6 +140,13 @@ class Hub:
             os.kill(children[0].pid, signal.SIGINT)
         await environment.process.wait()
         environment.process = None
+
+    async def delete_environment(self, env_name: str) -> None:
+        await self.stop_server(env_name)
+        logger.info(f"Deleting environment: {env_name}")
+        del self.environments[env_name]
+        env_dir = anyio.Path("environments") / env_name
+        await to_thread.run_sync(shutil.rmtree, env_dir)
 
     async def write_nginx_conf(self) -> None:
         async with self.lock:
