@@ -1,5 +1,6 @@
 import webbrowser
 from collections.abc import Callable
+from functools import partial
 from typing import Any
 
 from anyio import Event, create_task_group, sleep_forever
@@ -7,6 +8,7 @@ from anyio.abc import TaskStatus
 from fastapi import Request
 from fps import Context, Module, get_nowait, get_root_module, put
 from holm import App
+from jupyverse_api.auth import AuthConfig
 from jupyverse_api.lab import PageConfig
 from fastapi import FastAPI
 from structlog import get_logger
@@ -24,7 +26,7 @@ class MacroverseModule(Module):
         container: ContainerType,
         open_browser: bool,
     ):
-        super().__init__("macroverse", start_timeout=10)
+        super().__init__("macroverse", prepare_timeout=10, start_timeout=10)
         self.container = container
         self.open_browser = open_browser
         self.host = "localhost"
@@ -47,7 +49,7 @@ class MacroverseModule(Module):
             root_app.mount("/macroverse", macroverse_app)
 
             @macroverse_app.middleware("http")
-            async def add_environments(
+            async def put_hub(
                 request: Request, call_next: Callable[[Request], Any]
             ) -> Any:
                 async with Context():
@@ -67,7 +69,7 @@ class MacroverseModule(Module):
                     "page_config",
                     "terminals",
                     "lab",
-                    "noauth",
+                    "auth",
                     "contents",
                     "file_watcher",
                 ]
@@ -107,6 +109,8 @@ class MacroverseModule(Module):
         task_status: TaskStatus[None],
     ) -> None:
         async with jupyverse_module:
+            auth_config = await jupyverse_module.get(AuthConfig)
+            self.hub.auth_token = auth_config.token  # type: ignore[attr-defined]
             task_status.started()
             await stop_event.wait()
 
@@ -114,16 +118,18 @@ class MacroverseModule(Module):
         await self.hub.stop()
 
 
-async def hook(config: dict[str, Any]) -> None:
+async def hook(auth_token: str, config: dict[str, Any]) -> None:
     with get_nowait(Request) as request:
         uuid = request.headers["x-environment-id"]
         jupyverse_len = len("/jupyverse")
         for key, val in config.items():
             if isinstance(val, str) and val.startswith("/jupyverse"):
                 config[key] = f"/jupyverse/{uuid}" + val[jupyverse_len:]
+        config["token"] = auth_token
 
 
 class PageConfigHookModule(Module):
     async def prepare(self) -> None:
+        auth_config = await self.get(AuthConfig)
         page_config = await self.get(PageConfig)
-        page_config.register(hook)
+        page_config.register(partial(hook, auth_config.token))  # type: ignore[attr-defined]

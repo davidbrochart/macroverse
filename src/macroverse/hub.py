@@ -41,6 +41,7 @@ class Hub:
         self.nginx_port = nginx_port
         self.macroverse_port = macroverse_port
         self.container = container
+        self.auth_token = None
         self.lock = Lock()
         self.environments: dict[str, Environment] = {}
         self.nginx_conf_path = (
@@ -60,13 +61,13 @@ class Hub:
                     environment = Environment(id=environment_id)
                 self.environments[env_path.name] = environment
         await self.write_nginx_conf()
+        await open_process("nginx")
         logger.info("Starting nginx")
-        self.nginx_process = await open_process("nginx")
 
     async def stop(self) -> None:
         async with create_task_group() as tg:
             for name in self.environments:
-                tg.start_soon(self.stop_server, name)
+                tg.start_soon(self.stop_server, name, False)
         try:
             logger.info("Stopping nginx")
             await run_process("nginx -s stop")
@@ -161,7 +162,7 @@ class Hub:
                     break
         environment.process = process
 
-    async def stop_server(self, env_name: str) -> None:
+    async def stop_server(self, env_name: str, reload_nginx: bool = True) -> None:
         environment = self.environments[env_name]
         if environment.process is None:
             return
@@ -173,6 +174,10 @@ class Hub:
             os.kill(children[0].pid, signal.SIGINT)
         await environment.process.wait()
         environment.process = None
+        environment.port = None
+        await self.write_nginx_conf()
+        if reload_nginx:
+            await run_process("nginx -s reload")
 
     async def delete_environment(self, env_name: str) -> None:
         await self.stop_server(env_name)
@@ -180,6 +185,7 @@ class Hub:
         del self.environments[env_name]
         env_dir = anyio.Path("environments") / env_name
         await to_thread.run_sync(shutil.rmtree, env_dir)
+        await self.write_nginx_conf()
 
     async def write_nginx_conf(self) -> None:
         async with self.lock:
@@ -230,7 +236,6 @@ server {
 
     location /macroverse {
         proxy_pass http://localhost:MACROVERSE_PORT;
-        proxy_set_header Cache-Control "no-cache, no-store, must-revalidate";
     }
 
     # jupyverse kernel servers
@@ -243,11 +248,14 @@ server {
 
 NGINX_KERNEL_CONF = """
     # main jupyverse at MACROVERSE_PORT
-    location /jupyverse/UUID {
-        rewrite ^/jupyverse/UUID/(.*)$ /jupyverse/$1 break;
-        rewrite /jupyverse/UUID /jupyverse/lab break;
+    location /jupyverse {
         proxy_pass http://localhost:MACROVERSE_PORT;
         proxy_set_header X-Environment-ID UUID;
+    }
+    location /jupyverse/UUID {
+        rewrite ^/jupyverse/UUID/(.*)$ /jupyverse/$1 break;
+        rewrite /jupyverse/UUID /jupyverse break;
+        proxy_pass http://localhost:MACROVERSE_PORT;
     }
     location ~ ^/jupyverse/UUID/terminals/websocket/(.*)$ {
         proxy_http_version 1.1;
@@ -258,7 +266,7 @@ NGINX_KERNEL_CONF = """
         proxy_pass http://localhost:MACROVERSE_PORT;
     }
 
-    # jupyverse kernels ar KERNEL_SERVER_PORT
+    # jupyverse kernels at KERNEL_SERVER_PORT
     location /jupyverse/UUID/kernelspecs {
         rewrite ^/jupyverse/UUID/kernelspecs/(.*)$ /kernelspecs/$1 break;
         proxy_pass http://localhost:KERNEL_SERVER_PORT;
