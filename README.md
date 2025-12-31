@@ -1,5 +1,7 @@
 # Macroverse
 
+[![Build Status](https://github.com/davidbrochart/macroverse/workflows/test/badge.svg)](https://github.com/davidbrochart/macroverse/actions)
+
 [Jupyverse](https://github.com/jupyter-server/jupyverse) deployment.
 
 ## Installation

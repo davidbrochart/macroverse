@@ -86,7 +86,7 @@ class MacroverseModule(Module):
             jupyverse_module = get_root_module(config)
             stop_event = Event()
             await tg.start(self._run_jupyverse, jupyverse_module, stop_event)
-            root_app.mount("/jupyverse", jupyverse_module.app)
+            root_app.mount("/jupyverse", jupyverse_module.app)  # type: ignore[attr-defined]
 
             self.add_teardown_callback(stop_event.set)
             self.done()
