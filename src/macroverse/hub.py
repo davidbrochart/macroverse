@@ -234,6 +234,7 @@ server {
     }
 
     # jupyverse kernel servers
+
 # NGINX_KERNEL_CONF
 
 }
@@ -241,12 +242,23 @@ server {
 
 
 NGINX_KERNEL_CONF = """
+    # main jupyverse at MACROVERSE_PORT
     location /jupyverse/UUID {
         rewrite ^/jupyverse/UUID/(.*)$ /jupyverse/$1 break;
         rewrite /jupyverse/UUID /jupyverse/lab break;
         proxy_pass http://localhost:MACROVERSE_PORT;
         proxy_set_header X-Environment-ID UUID;
     }
+    location ~ ^/jupyverse/UUID/terminals/websocket/(.*)$ {
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        proxy_set_header Host $host;
+        rewrite ^/jupyverse/UUID/terminals/websocket/(.*)$ /jupyverse/terminals/websocket/$1 break;
+        proxy_pass http://localhost:MACROVERSE_PORT;
+    }
+
+    # jupyverse kernels ar KERNEL_SERVER_PORT
     location /jupyverse/UUID/kernelspecs {
         rewrite ^/jupyverse/UUID/kernelspecs/(.*)$ /kernelspecs/$1 break;
         proxy_pass http://localhost:KERNEL_SERVER_PORT;
