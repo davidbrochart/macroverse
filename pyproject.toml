@@ -26,7 +26,6 @@ classifiers = [
   "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: 3.14",
   "Programming Language :: Python :: Implementation :: CPython",
-  "Programming Language :: Python :: Implementation :: PyPy",
 ]
 
 dependencies = [
@@ -40,6 +39,11 @@ dependencies = [
   "psutil",
   "types-psutil",
   "types-PyYAML",
+]
+
+[dependency-groups]
+dev = [
+  "ty",
 ]
 
 [project.urls]
