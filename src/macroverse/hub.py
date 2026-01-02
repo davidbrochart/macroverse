@@ -78,9 +78,7 @@ class Hub:
         environment = yaml.load(environment_yaml, Loader=yaml.CLoader)
         env_name = environment["name"]
         logger.info(f"Creating environment: {env_name}")
-        self.environments[env_name] = _environment = Environment(
-            create_time=0
-        )
+        self.environments[env_name] = _environment = Environment(create_time=0)
         self.task_group.start_soon(self._create_environment, environment, _environment)
 
     async def _creation_timer(self, environment: "Environment") -> None:
