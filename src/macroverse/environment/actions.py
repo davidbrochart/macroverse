@@ -39,5 +39,5 @@ async def cancel() -> Component:
 @action.put()
 async def create(environment_yaml: Annotated[str, Form()]) -> Component:
     with get_nowait(Hub) as hub:
-        await hub.create_environment(environment_yaml)
+        hub.create_environment(environment_yaml)
         return get_environments_and_create_button()

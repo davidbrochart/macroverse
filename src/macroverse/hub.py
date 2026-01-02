@@ -74,9 +74,11 @@ class Hub:
         except Exception:
             pass
 
-    async def create_environment(self, environment_yaml: str) -> None:
+    def create_environment(self, environment_yaml: str) -> None:
         environment = yaml.load(environment_yaml, Loader=yaml.CLoader)
-        self.environments[environment["name"]] = _environment = Environment(
+        env_name = environment["name"]
+        logger.info(f"Creating environment: {env_name}")
+        self.environments[env_name] = _environment = Environment(
             create_time=0
         )
         self.task_group.start_soon(self._create_environment, environment, _environment)
@@ -133,6 +135,7 @@ class Hub:
                 tg.cancel_scope.cancel()
 
     async def start_server(self, env_name):
+        logger.info(f"Starting server for environment: {env_name}")
         environment = self.environments[env_name]
         port = get_unused_tcp_ports(1)[0]
         if self.container == "process":
@@ -248,20 +251,15 @@ server {
 
 NGINX_KERNEL_CONF = """
     # main jupyverse at MACROVERSE_PORT
-    location /jupyverse {
-        proxy_pass http://localhost:MACROVERSE_PORT;
-        proxy_set_header X-Environment-ID UUID;
-    }
     location /jupyverse/UUID {
         rewrite ^/jupyverse/UUID/(.*)$ /jupyverse/$1 break;
-        rewrite /jupyverse/UUID /jupyverse break;
         proxy_pass http://localhost:MACROVERSE_PORT;
+        proxy_set_header X-Environment-ID UUID;
     }
     location ~ ^/jupyverse/UUID/terminals/websocket/(.*)$ {
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection $connection_upgrade;
-        proxy_set_header Host $host;
         rewrite ^/jupyverse/UUID/terminals/websocket/(.*)$ /jupyverse/terminals/websocket/$1 break;
         proxy_pass http://localhost:MACROVERSE_PORT;
     }
@@ -288,7 +286,6 @@ NGINX_KERNEL_CONF = """
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection $connection_upgrade;
-        proxy_set_header Host $host;
         rewrite ^/jupyverse/UUID/api/kernels/(.*)$ /api/kernels/$1 break;
         proxy_pass http://localhost:KERNEL_SERVER_PORT;
     }
