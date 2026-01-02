@@ -23,7 +23,7 @@ def get_environment(name: str) -> ComponentType:
                     name,
                     target="_blank",
                     rel="noopener noreferrer",
-                    href=f"/jupyverse/{environment.id}?token={hub.auth_token}",
+                    href=f"/jupyverse/{environment.id}/?token={hub.auth_token}&redirect=/jupyverse/{environment.id}/lab",
                 )
             )
         ]
