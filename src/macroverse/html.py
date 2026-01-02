@@ -7,14 +7,14 @@ from .hub import Hub
 def get_environments() -> ComponentType:
     with get_nowait(Hub) as hub:
         return html.table(
-            html.tbody(*[get_environment(name) for name in hub.environments]),
+            html.tbody(*[get_environment(name) for name in hub.containers]),
             id="environments",
         )
 
 
 def get_environment(name: str) -> ComponentType:
     with get_nowait(Hub) as hub:
-        environment = hub.environments[name]
+        environment = hub.containers[name].environment
         elements = [
             html.td(
                 name
@@ -76,12 +76,12 @@ def stop_server_button(name: str) -> ComponentType:
 
 def creating_button(name: str) -> ComponentType:
     with get_nowait(Hub) as hub:
-        environment = hub.environments[name]
-        if environment.create_time is None:
+        create_time = hub.containers[name].environment.create_time
+        if create_time is None:
             return start_server_button(name)
         else:
             return html.div(
-                f"Creating ({environment.create_time}s)",
+                f"Creating ({create_time}s)",
                 hx_get=f"/macroverse/environment/{name}/status",
                 hx_trigger="load delay:1s",
                 hx_swap="outerHTML",
