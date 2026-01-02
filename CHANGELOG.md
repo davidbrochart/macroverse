@@ -1,5 +1,10 @@
 # Version history
 
+## 0.3.0
+
+- Refactor to abstract out containers.
+- Use Jupyverse v0.11.
+
 ## 0.2.0
 
 - Add authentication to main Jupyverse server.
