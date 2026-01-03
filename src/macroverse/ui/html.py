@@ -1,7 +1,7 @@
 from fps import get_nowait
 from htmy import ComponentType, html
 
-from .hub import Hub
+from ..hub import Hub
 
 
 def get_environments() -> ComponentType:

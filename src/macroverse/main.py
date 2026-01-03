@@ -7,13 +7,13 @@ from anyio import Event, create_task_group, sleep_forever
 from anyio.abc import TaskStatus
 from fastapi import Request
 from fps import Context, Module, get_nowait, get_root_module, put
-from holm import App
 from jupyverse_api.auth import AuthConfig
 from jupyverse_api.lab import PageConfig
 from fastapi import FastAPI
 from structlog import get_logger
 
 from .hub import ContainerType, Hub
+from .ui.main import macroverse_app
 from .utils import get_unused_tcp_ports
 
 
@@ -42,11 +42,8 @@ class MacroverseModule(Module):
     async def prepare(self):
         async with create_task_group() as tg:
             root_app = await self.get(FastAPI)
-            macroverse_app = FastAPI()
-            self.hub = Hub(tg, self.nginx_port, self.macroverse_port, self.container)
-
-            App(app=macroverse_app)
             root_app.mount("/macroverse", macroverse_app)
+            self.hub = Hub(tg, self.nginx_port, self.macroverse_port, self.container)
 
             @macroverse_app.middleware("http")
             async def put_hub(
