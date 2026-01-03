@@ -6,7 +6,7 @@ from holm import action
 from htmy import Component, html
 
 from ..html import get_environments_and_create_button
-from ..hub import Hub
+from ...hub import Hub
 
 
 @action.get()

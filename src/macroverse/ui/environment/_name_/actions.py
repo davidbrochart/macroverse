@@ -4,7 +4,7 @@ from holm import action
 
 
 from ...html import get_environment, get_environments
-from ...hub import Hub
+from ....hub import Hub
 
 
 @action.get()
