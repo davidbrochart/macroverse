@@ -1,22 +1,24 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Any
+from uuid import UUID, uuid4
 
 from anyio import Path
-
-from ..models import Environment
+from anyio.abc import Process
 
 
 @dataclass
 class Container(ABC):
-    environment: Environment
+    id: UUID | str = field(default_factory=uuid4)
+    path: Path | None = None
+    definition: dict[str, Any] | None = None
+    port: int | None = None
+    process: Process | None = None
+    create_time: int | None = None
 
     @classmethod
     @abstractmethod
     async def from_existing_environment(cls, env_path: Path) -> "Container": ...
-
-    @classmethod
-    @abstractmethod
-    def new(cls, environment: Environment) -> "Container": ...
 
     @abstractmethod
     async def create_environment(self) -> None: ...
