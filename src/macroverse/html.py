@@ -14,22 +14,22 @@ def get_environments() -> ComponentType:
 
 def get_environment(name: str) -> ComponentType:
     with get_nowait(Hub) as hub:
-        environment = hub.containers[name].environment
+        container = hub.containers[name]
         elements = [
             html.td(
                 name
-                if environment.create_time is not None or environment.process is None
+                if container.create_time is not None or container.process is None
                 else html.a(
                     name,
                     target="_blank",
                     rel="noopener noreferrer",
-                    href=f"/jupyverse/{environment.id}/?token={hub.auth_token}&redirect=/jupyverse/{environment.id}/lab",
+                    href=f"/jupyverse/{container.id}/?token={hub.auth_token}&redirect=/jupyverse/{container.id}/lab",
                 )
             )
         ]
         add_delete_button = True
-        if environment.create_time is None:
-            if environment.process:
+        if container.create_time is None:
+            if container.process:
                 button = stop_server_button(name)
             else:
                 button = start_server_button(name)
@@ -76,7 +76,7 @@ def stop_server_button(name: str) -> ComponentType:
 
 def creating_button(name: str) -> ComponentType:
     with get_nowait(Hub) as hub:
-        create_time = hub.containers[name].environment.create_time
+        create_time = hub.containers[name].create_time
         if create_time is None:
             return start_server_button(name)
         else:

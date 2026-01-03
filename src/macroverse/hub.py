@@ -21,7 +21,6 @@ from anyio import (
 from anyio.abc import TaskGroup
 
 from .containers.base import Container
-from .models import Environment
 from .utils import get_unused_tcp_ports
 
 
@@ -81,24 +80,22 @@ class Hub:
             return
 
         logger.info(f"Creating environment: {env_name}")
-        environment = Environment(
+        self.containers[env_name] = container = self.Container(
             create_time=0, definition=environment_dict, path=env_path
         )
-        self.containers[env_name] = container = self.Container.new(environment)
         self.task_group.start_soon(self._create_environment, container)
 
-    async def _creation_timer(self, environment: Environment) -> None:
+    async def _creation_timer(self, container: Container) -> None:
         while True:
             await sleep(1)
-            assert environment.create_time is not None
-            environment.create_time += 1
+            assert container.create_time is not None
+            container.create_time += 1
 
     async def _create_environment(self, container: Container) -> None:
         async with create_task_group() as tg:
-            tg.start_soon(self._creation_timer, container.environment)
-            env_def = container.environment.definition
-            assert env_def is not None
-            env_def["dependencies"].extend(
+            tg.start_soon(self._creation_timer, container)
+            assert container.definition is not None
+            container.definition["dependencies"].extend(
                 [
                     "rich-click",
                     "anycorn",
@@ -111,7 +108,7 @@ class Hub:
                 ]
             )
             await container.create_environment()
-            container.environment.create_time = None
+            container.create_time = None
             tg.cancel_scope.cancel()
 
     async def start_server(self, env_name):
@@ -120,7 +117,7 @@ class Hub:
         port = get_unused_tcp_ports(1)[0]
         cmd = container.get_server_command(port)
         process = await open_process(cmd, stdout=None, stderr=None)
-        container.environment.port = (
+        container.port = (
             port  # port must be set before writing NGINX conf, but not process!
         )
         await self.write_nginx_conf()
@@ -134,21 +131,21 @@ class Hub:
                     pass
                 else:
                     break
-        container.environment.process = process
+        container.process = process
 
     async def stop_server(self, env_name: str, reload_nginx: bool = True) -> None:
-        environment = self.containers[env_name].environment
-        if environment.process is None:
+        container = self.containers[env_name]
+        if container.process is None:
             return
 
         logger.info(f"Stopping server for environment: {env_name}")
-        process = psutil.Process(environment.process.pid)
+        process = psutil.Process(container.process.pid)
         children = process.children(recursive=True)
         if children:
             os.kill(children[0].pid, signal.SIGINT)
-        await environment.process.wait()
-        environment.process = None
-        environment.port = None
+        await container.process.wait()
+        container.process = None
+        container.port = None
         await self.write_nginx_conf()
         if reload_nginx:
             await run_process("nginx -s reload")
@@ -167,14 +164,13 @@ class Hub:
                 "MACROVERSE_PORT", str(self.macroverse_port)
             )
             for name, container in self.containers.items():
-                environment = container.environment
-                if environment.port is not None:
+                if container.port is not None:
                     nginx_kernel_conf = (
                         NGINX_KERNEL_CONF.replace(
-                            "KERNEL_SERVER_PORT", str(environment.port)
+                            "KERNEL_SERVER_PORT", str(container.port)
                         )
                         .replace("MACROVERSE_PORT", str(self.macroverse_port))
-                        .replace("UUID", str(environment.id))
+                        .replace("UUID", str(container.id))
                     )
                     nginx_conf = nginx_conf.replace(
                         "# NGINX_KERNEL_CONF", nginx_kernel_conf
