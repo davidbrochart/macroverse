@@ -1,5 +1,11 @@
 # Version history
 
+## 0.4.0
+
+- Fall back to pure-Python PyYAML.
+- Move API to `ui` directory.
+- Remove environment model.
+
 ## 0.3.0
 
 - Refactor to abstract out containers.
