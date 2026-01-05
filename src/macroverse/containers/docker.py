@@ -1,5 +1,10 @@
-import yaml
 from anyio import Path, run_process
+from yaml import dump
+
+try:
+    from yaml import CDumper as Dumper
+except ImportError:
+    from yaml import Dumper
 
 from .base import Container as _Container
 
@@ -19,7 +24,7 @@ class Container(_Container):
     async def create_environment(self) -> None:
         assert self.definition is not None
         self.definition["name"] = "base"
-        environment_str = yaml.dump(self.definition, Dumper=yaml.CDumper)
+        environment_str = dump(self.definition, Dumper=Dumper)
         assert self.path is not None
         await self.path.mkdir(parents=True)
         await (self.path / "environment.yaml").write_text(environment_str)

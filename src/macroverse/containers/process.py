@@ -1,5 +1,10 @@
-import yaml
 from anyio import NamedTemporaryFile, Path, run_process
+from yaml import dump
+
+try:
+    from yaml import CDumper as Dumper
+except ImportError:
+    from yaml import Dumper
 
 from .base import Container as _Container
 
@@ -10,7 +15,7 @@ class Container(_Container):
         return cls(path=env_path)
 
     async def create_environment(self) -> None:
-        environment_str = yaml.dump(self.definition, Dumper=yaml.CDumper)
+        environment_str = dump(self.definition, Dumper=Dumper)
         async with NamedTemporaryFile(
             mode="wb", buffering=0, suffix=".yaml"
         ) as environment_file:
