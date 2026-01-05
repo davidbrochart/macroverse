@@ -8,7 +8,6 @@ from typing import Literal
 import httpx
 import psutil
 import structlog
-import yaml
 from anyio import (
     Lock,
     Path,
@@ -19,6 +18,12 @@ from anyio import (
     to_thread,
 )
 from anyio.abc import TaskGroup
+from yaml import load
+
+try:
+    from yaml import CLoader as Loader
+except ImportError:
+    from yaml import Loader
 
 from .containers.base import Container
 from .utils import get_unused_tcp_ports
@@ -72,7 +77,7 @@ class Hub:
             pass
 
     async def create_environment(self, environment_yaml: str) -> None:
-        environment_dict = yaml.load(environment_yaml, Loader=yaml.CLoader)
+        environment_dict = load(environment_yaml, Loader=Loader)
         env_name = environment_dict["name"]
         env_path = Path("environments") / env_name
         if await env_path.exists():
