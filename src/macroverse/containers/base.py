@@ -15,6 +15,7 @@ class Container(ABC):
     port: int | None = None
     process: Process | None = None
     create_time: int | None = None
+    nginx_conf: str | None = None
 
     @classmethod
     @abstractmethod

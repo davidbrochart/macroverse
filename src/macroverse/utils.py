@@ -1,4 +1,6 @@
+import string
 from socket import socket
+from typing import Any
 
 
 def get_unused_tcp_ports(number: int) -> list[int]:
@@ -12,3 +14,58 @@ def get_unused_tcp_ports(number: int) -> list[int]:
     finally:
         for sock in sockets:
             sock.close()
+
+
+def process_routes(
+    routes: list[dict[str, Any]], environment_server_port: int, uuid: str
+) -> str:
+    http_redirects = {}
+    ws_redirects = {}
+    for route in routes:
+        path = route["path"]
+        names = [v[1] for v in string.Formatter().parse(path) if v[1] is not None]
+        src = path.format(**{name: "(.*)" for name in names})
+        dst = path.format(**{name: f"${i + 1}" for i, name in enumerate(names)})
+        if route["methods"] == ["WEBSOCKET"]:
+            ws_redirects[src] = dst
+        else:
+            http_redirects[src] = dst
+    redirects = []
+    for src, dst in ws_redirects.items():
+        redirects.append(
+            NGINX_REDIRECT_WS.format(
+                uuid=uuid,
+                src=src,
+                dst=dst,
+                environment_server_port=environment_server_port,
+            )
+        )
+    for src, dst in http_redirects.items():
+        redirects.append(
+            NGINX_REDIRECT_HTTP.format(
+                uuid=uuid,
+                src=src,
+                dst=dst,
+                environment_server_port=environment_server_port,
+            )
+        )
+    return "".join(redirects)
+
+
+NGINX_REDIRECT_HTTP = """
+    location ~ ^/jupyverse/{uuid}{src} {{
+        rewrite ^/jupyverse/{uuid}{src} {dst} break;
+        proxy_pass http://localhost:{environment_server_port};
+    }}
+"""
+
+
+NGINX_REDIRECT_WS = """
+    location ~ ^/jupyverse/{uuid}{src} {{
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        rewrite ^/jupyverse/{uuid}{src} {dst} break;
+        proxy_pass http://localhost:{environment_server_port};
+    }}
+"""

@@ -2,7 +2,7 @@
 
 [![Build Status](https://github.com/davidbrochart/macroverse/workflows/test/badge.svg)](https://github.com/davidbrochart/macroverse/actions)
 
-[Jupyverse](https://github.com/jupyter-server/jupyverse) deployment.
+[Jupyverse](https://github.com/jupyter-server/jupyverse) environment deployment.
 
 ## Installation
 
@@ -20,7 +20,7 @@ pip install macroverse
 
 ### Process containers
 
-In this configuration, Jupyter kernel servers run in processes on the same machine.
+In this configuration, Jupyter servers run in processes on the same machine.
 
 Enter in the terminal:
 
@@ -29,24 +29,13 @@ macroverse --open-browser
 ```
 
 This should open a browser window with a list of environments.
-Click on `New environment` and enter this `Environment YAML`:
-
-```yaml
-name: my-env
-channels:
-  - conda-forge
-dependencies:
-  - ipykernel
-  - matplotlib
-  - numpy
-```
-
+Click on `New environment` and enter an `Environment YAML`.
 Click `Submit` and wait until the environment is created. Then click `Start server` next to your environment name.
 This should change the environment name into a link. If you click on it, this should open JupyterLab in a new tab.
 
 ### Docker containers
 
-You must have Docker installed. In this configuration, Jupyter kernel servers run in Docker containers.
+You must have Docker installed. In this configuration, Jupyter servers run in Docker containers.
 
 Enter in the terminal:
 

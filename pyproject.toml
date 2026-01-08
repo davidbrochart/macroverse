@@ -5,7 +5,7 @@ build-backend = "uv_build"
 [project]
 name = "macroverse"
 version = "0.4.0"
-description = "Jupyverse deployment"
+description = "Jupyverse environment deployment"
 license = { file = "LICENSE" }
 authors = [
   { name = "David Brochart", email = "david.brochart@gmail.com" },
@@ -29,6 +29,7 @@ classifiers = [
 ]
 
 dependencies = [
+  "fps >=0.5.8,<0.6.0",
   "jupyverse[jupyterlab,auth] >=0.11.1,<0.12.0",
   "cyclopts >=4.4.3,<5.0.0",
   "holm >=0.7.4",

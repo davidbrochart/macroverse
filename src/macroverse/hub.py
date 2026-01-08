@@ -26,7 +26,7 @@ except ImportError:
     from yaml import Loader
 
 from .containers.base import Container
-from .utils import get_unused_tcp_ports
+from .utils import get_unused_tcp_ports, process_routes
 
 
 ContainerType = Literal["process", "docker"]
@@ -99,19 +99,6 @@ class Hub:
     async def _create_environment(self, container: Container) -> None:
         async with create_task_group() as tg:
             tg.start_soon(self._creation_timer, container)
-            assert container.definition is not None
-            container.definition["dependencies"].extend(
-                [
-                    "rich-click",
-                    "anycorn",
-                    "jupyverse-api",
-                    "fps-file-watcher",
-                    "fps-kernels",
-                    "fps-kernel-subprocess",
-                    "fps-noauth",
-                    "fps-frontend",
-                ]
-            )
             await container.create_environment()
             container.create_time = None
             tg.cancel_scope.cancel()
@@ -122,21 +109,24 @@ class Hub:
         port = get_unused_tcp_ports(1)[0]
         cmd = container.get_server_command(port)
         process = await open_process(cmd, stdout=None, stderr=None)
-        container.port = (
-            port  # port must be set before writing NGINX conf, but not process!
-        )
-        await self.write_nginx_conf()
-        await run_process("nginx -s reload")
         async with httpx.AsyncClient() as client:
             while True:
                 await sleep(0.1)
                 try:
-                    await client.get(f"http://127.0.0.1:{port}")
+                    response = await client.get(f"http://127.0.0.1:{port}/routes")
+                    break
                 except Exception:
                     pass
-                else:
-                    break
+        routes = response.json()
+        container.nginx_conf = NGINX_MAIN_JUPYVERSE_CONF.format(
+            uuid=container.id,
+            macroverse_port=self.macroverse_port,
+            environment_server_port=port,
+        ) + process_routes(routes, port, str(container.id))
+        container.port = port
         container.process = process
+        await self.write_nginx_conf()
+        await run_process("nginx -s reload")
 
     async def stop_server(self, env_name: str, reload_nginx: bool = True) -> None:
         container = self.containers[env_name]
@@ -165,101 +155,59 @@ class Hub:
 
     async def write_nginx_conf(self) -> None:
         async with self.lock:
-            nginx_conf = NGINX_CONF.replace("NGINX_PORT", str(self.nginx_port)).replace(
-                "MACROVERSE_PORT", str(self.macroverse_port)
-            )
+            nginx_conf = [
+                NGINX_CONF.format(
+                    nginx_port=self.nginx_port, macroverse_port=self.macroverse_port
+                )
+            ]
             for name, container in self.containers.items():
-                if container.port is not None:
-                    nginx_kernel_conf = (
-                        NGINX_KERNEL_CONF.replace(
-                            "KERNEL_SERVER_PORT", str(container.port)
-                        )
-                        .replace("MACROVERSE_PORT", str(self.macroverse_port))
-                        .replace("UUID", str(container.id))
-                    )
-                    nginx_conf = nginx_conf.replace(
-                        "# NGINX_KERNEL_CONF", nginx_kernel_conf
-                    )
-            await self.nginx_conf_path.write_text(nginx_conf)
+                if container.nginx_conf:
+                    nginx_conf.append(container.nginx_conf)
+            nginx_conf.append("}")
+            nginx_conf_str = "".join(nginx_conf)
+            await self.nginx_conf_path.write_text(nginx_conf_str)
 
 
 NGINX_CONF = """\
-map $http_upgrade $connection_upgrade {
+map $http_upgrade $connection_upgrade {{
     default upgrade;
     ''      close;
-}
+}}
 
-server {
-    # nginx at NGINX_PORT
-    listen       NGINX_PORT;
+server {{
+    # nginx at {nginx_port}
+
+    listen       {nginx_port};
     server_name  localhost;
 
-    # macroverse at MACROVERSE_PORT
-    location = / {
+    # macroverse at {macroverse_port}
+
+    location = / {{
         rewrite / /macroverse break;
-        proxy_pass http://localhost:MACROVERSE_PORT;
-    }
+        proxy_pass http://localhost:{macroverse_port};
+    }}
 
-    location /macroverse {
-        proxy_pass http://localhost:MACROVERSE_PORT;
-    }
-
-    # jupyverse kernel servers
-
-# NGINX_KERNEL_CONF
-
-}
+    location /macroverse {{
+        proxy_pass http://localhost:{macroverse_port};
+    }}
 """
 
 
-NGINX_KERNEL_CONF = """
-    # main jupyverse at MACROVERSE_PORT
-    location /jupyverse/UUID {
-        rewrite ^/jupyverse/UUID/(.*)$ /jupyverse/$1 break;
-        proxy_pass http://localhost:MACROVERSE_PORT;
-        proxy_set_header X-Environment-ID UUID;
-    }
-    location ~ ^/jupyverse/UUID/terminals/websocket/(.*)$ {
+NGINX_MAIN_JUPYVERSE_CONF = """
+    # jupyverse in main environment at {macroverse_port}
+
+    location /jupyverse/{uuid} {{
+        rewrite ^/jupyverse/{uuid}/(.*)$ /jupyverse/$1 break;
+        proxy_pass http://localhost:{macroverse_port};
+        proxy_set_header X-Environment-ID {uuid};
+    }}
+    location ~ ^/jupyverse/{uuid}/terminals/websocket/(.*)$ {{
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection $connection_upgrade;
-        rewrite ^/jupyverse/UUID/terminals/websocket/(.*)$ /jupyverse/terminals/websocket/$1 break;
-        proxy_pass http://localhost:MACROVERSE_PORT;
-    }
+        rewrite ^/jupyverse/{uuid}/terminals/websocket/(.*)$ /jupyverse/terminals/websocket/$1 break;
+        proxy_pass http://localhost:{macroverse_port};
+    }}
 
-    # jupyverse kernels at KERNEL_SERVER_PORT
-    location /jupyverse/UUID/kernelspecs {
-        rewrite ^/jupyverse/UUID/kernelspecs/(.*)$ /kernelspecs/$1 break;
-        proxy_pass http://localhost:KERNEL_SERVER_PORT;
-    }
-    location /jupyverse/UUID/api/kernelspecs {
-        rewrite /jupyverse/UUID/api/kernelspecs /api/kernelspecs break;
-        proxy_pass http://localhost:KERNEL_SERVER_PORT;
-    }
-    location /jupyverse/UUID/api/kernels {
-        rewrite /jupyverse/UUID/api/kernels /api/kernels break;
-        proxy_pass http://localhost:KERNEL_SERVER_PORT;
-    }
-    location ~ ^/jupyverse/UUID/api/kernels/(.*)$ {
-        if ($http_upgrade != "websocket") {
-            rewrite ^/jupyverse/UUID/api/kernels/(.*)$ /api/kernels/$1 break;
-            proxy_pass http://localhost:KERNEL_SERVER_PORT;
-            break;
-        }
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection $connection_upgrade;
-        rewrite ^/jupyverse/UUID/api/kernels/(.*)$ /api/kernels/$1 break;
-        proxy_pass http://localhost:KERNEL_SERVER_PORT;
-    }
-    location /jupyverse/UUID/api/sessions {
-        rewrite /jupyverse/UUID/api/sessions /api/sessions break;
-        proxy_pass http://localhost:KERNEL_SERVER_PORT;
-    }
-    location ~ ^/jupyverse/UUID/api/sessions/(.*)$ {
-        rewrite ^/jupyverse/UUID/api/sessions/(.*)$ /api/sessions/$1 break;
-        proxy_pass http://localhost:KERNEL_SERVER_PORT;
-    }
-
-# NGINX_KERNEL_CONF
+    # jupyverse in environment {uuid} at {environment_server_port}
 """
