@@ -26,9 +26,7 @@ class Container(_Container):
             await run_process(create_environment_cmd)
 
     def get_server_command(self, port: int) -> str:
-        launch_jupyverse_cmd = (
-            f"jupyverse --port {port} --set frontend.base_url=/jupyverse/{self.id}/"
-        )
+        launch_jupyverse_cmd = f'jupyverse --port {port} --set frontend.base_url=/jupyverse/{self.id}/ --set openapi_url="" --set routes_url="/routes" --timeout 10'
         assert self.path is not None
         cmd = (
             """bash -c 'eval "$(micromamba shell hook --shell bash)";"""

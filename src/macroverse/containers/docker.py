@@ -17,7 +17,7 @@ class Container(_Container):
         return cls(id=environment_id, path=env_path)
 
     def get_server_command(self, port: int) -> str:
-        launch_jupyverse_cmd = f"jupyverse --host 0.0.0.0 --port 5000 --set frontend.base_url=/jupyverse/{self.id}/"
+        launch_jupyverse_cmd = f'jupyverse --host 0.0.0.0 --port 5000 --set frontend.base_url=/jupyverse/{self.id}/ --set openapi_url="" --set routes_url="/routes" --timeout 10'
         cmd = f"docker run -p {port}:5000 {self.id} {launch_jupyverse_cmd}"
         return cmd
 

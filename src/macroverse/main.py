@@ -26,7 +26,7 @@ class MacroverseModule(Module):
         container: ContainerType,
         open_browser: bool,
     ):
-        super().__init__("macroverse", prepare_timeout=10, start_timeout=10)
+        super().__init__("macroverse", prepare_timeout=1, start_timeout=1)
         self.container = container
         self.open_browser = open_browser
         self.host = "localhost"
