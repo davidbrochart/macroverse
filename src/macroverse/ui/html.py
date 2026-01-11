@@ -4,10 +4,89 @@ from htmy import ComponentType, html
 from ..hub import Hub
 
 
-def get_environments() -> ComponentType:
+def get_servers() -> ComponentType:
     with get_nowait(Hub) as hub:
         return html.table(
-            html.tbody(*[get_environment(name) for name in hub.containers]),
+            html.tbody(*[get_server(uuid) for uuid in hub.servers]),
+            id="servers",
+        )
+
+
+def add_environment_button(id: str) -> ComponentType:
+    return html.button(
+        "Add environment(s)",
+        hx_get=f"/macroverse/server/{id}/edit-environments",
+        hx_swap="outerHTML",
+        id=f"server-{id}-add-enviromnent",
+    )
+
+
+def get_server(uuid: str) -> ComponentType:
+    with get_nowait(Hub) as hub:
+        server = hub.servers[uuid]
+        elements = [
+            html.td(
+                html.a(
+                    server.id[:8],
+                    target="_blank",
+                    rel="noopener noreferrer",
+                    href=f"/jupyverse/{server.id}/?token={hub.auth_token}&redirect=/jupyverse/{server.id}/lab",
+                )
+            ),
+            html.td(
+                get_server_environments(uuid),
+                add_environment_button(uuid),
+            ),
+            html.td(
+                html.button(
+                    "Delete",
+                    hx_delete=f"/macroverse/server/{server.id}",
+                    hx_swap="outerHTML",
+                    hx_target="#servers",
+                    style="background:red",
+                )
+            ),
+        ]
+        return html.tr(
+            *elements,
+            id=f"server-{server.id}",
+        )
+
+
+def get_server_environments(id: str) -> ComponentType:
+    with get_nowait(Hub) as hub:
+        server = hub.servers[id]
+        return html.table(
+            html.tbody(
+                *[get_server_environment(id, name) for name in server.environments]
+            ),
+            id=f"server-{id}-environments",
+        )
+
+
+def get_server_environment(uuid: str, name: str, edit_element=None) -> ComponentType:
+    elements = [
+        html.td(name),
+        html.td(
+            html.button(
+                "Remove",
+                hx_delete=f"/macroverse/server/{uuid}/environment/{name}",
+                hx_swap="outerHTML",
+                hx_target=f"#server-{uuid}",
+                style="background:red",
+            ),
+        ),
+    ]
+    if edit_element is not None:
+        elements.append(html.td(edit_element))
+    return html.tr(*elements)
+
+
+def get_environments() -> ComponentType:
+    with get_nowait(Hub) as hub:
+        elements = [get_environment(name) for name in hub.containers]
+        return html.table(
+            html.tbody(*elements),
             id="environments",
         )
 
@@ -15,40 +94,20 @@ def get_environments() -> ComponentType:
 def get_environment(name: str) -> ComponentType:
     with get_nowait(Hub) as hub:
         container = hub.containers[name]
-        elements = [
-            html.td(
-                name
-                if container.create_time is not None or container.process is None
-                else html.a(
-                    name,
-                    target="_blank",
-                    rel="noopener noreferrer",
-                    href=f"/jupyverse/{container.id}/?token={hub.auth_token}&redirect=/jupyverse/{container.id}/lab",
-                )
-            )
-        ]
-        add_delete_button = True
+        elements = [html.td(name)]
         if container.create_time is None:
-            if container.process:
-                button = stop_server_button(name)
-            else:
-                button = start_server_button(name)
-        else:
-            button = creating_button(name)
-            add_delete_button = False
-        elements.append(html.td(button))
-        if add_delete_button:
-            elements.append(
-                html.td(
-                    html.button(
-                        "Delete environment",
-                        hx_delete=f"/macroverse/environment/{name}/delete-environment",
-                        hx_swap="outerHTML",
-                        hx_target="#environments",
-                        style="background:red",
-                    )
+            element = html.td(
+                html.button(
+                    "Delete",
+                    hx_delete=f"/macroverse/environment/{name}/delete-environment",
+                    hx_swap="outerHTML",
+                    hx_target="#environments",
+                    style="background:red",
                 )
             )
+        else:
+            element = creating_environment(name)
+        elements.append(html.td(element))
         return html.tr(
             *elements,
             id=f"environment_{name}",
@@ -64,17 +123,7 @@ def start_server_button(name: str) -> ComponentType:
     )
 
 
-def stop_server_button(name: str) -> ComponentType:
-    return html.button(
-        "Stop server",
-        style="background:red",
-        hx_delete=f"/macroverse/environment/{name}/delete",
-        hx_swap="outerHTML",
-        hx_target=f"#environment_{name}",
-    )
-
-
-def creating_button(name: str) -> ComponentType:
+def creating_environment(name: str) -> ComponentType:
     with get_nowait(Hub) as hub:
         create_time = hub.containers[name].create_time
         if create_time is None:
@@ -89,17 +138,9 @@ def creating_button(name: str) -> ComponentType:
             )
 
 
-def create_button() -> ComponentType:
+def new_environment() -> ComponentType:
     return html.button(
         "New environment",
         hx_swap="outerHTML",
         hx_get="/macroverse/environment/edit",
-    )
-
-
-def get_environments_and_create_button() -> ComponentType:
-    return html.div(
-        get_environments(),
-        create_button(),
-        id="environments_and_create_button",
     )

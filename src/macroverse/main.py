@@ -26,7 +26,7 @@ class MacroverseModule(Module):
         container: ContainerType,
         open_browser: bool,
     ):
-        super().__init__("macroverse", prepare_timeout=1, start_timeout=1)
+        super().__init__("macroverse", prepare_timeout=10, start_timeout=10)
         self.container = container
         self.open_browser = open_browser
         self.host = "localhost"
@@ -64,7 +64,6 @@ class MacroverseModule(Module):
                     "nbconvert",
                     "app",
                     "page_config",
-                    "terminals",
                     "lab",
                     "auth",
                     "contents",
