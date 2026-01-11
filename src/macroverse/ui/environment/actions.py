@@ -5,7 +5,7 @@ from fps import get_nowait
 from holm import action
 from htmy import Component, html
 
-from ..html import get_environments_and_create_button
+from ..html import get_environments, new_environment
 from ...hub import Hub
 
 
@@ -26,24 +26,26 @@ async def edit() -> Component:
         ),
         html.button(
             "Cancel",
-            hx_get="/macroverse/environment/cancel",
+            hx_get="/macroverse/environment/new",
+            hx_target="#edit-environment",
+            hx_swap="outerHTML",
         ),
         hx_put="/macroverse/environment/create",
-        hx_target="#environments_and_create_button",
-        hw_swap="outerHTML",
+        hx_target="#environments-new",
+        id="edit-environment",
     )
 
 
 @action.get()
-async def cancel() -> Component:
-    return get_environments_and_create_button()
+async def new() -> Component:
+    return new_environment()
 
 
 @action.put()
 async def create(environment_yaml: Annotated[str, Form()]) -> Component:
     with get_nowait(Hub) as hub:
         await hub.create_environment(environment_yaml)
-        return get_environments_and_create_button()
+        return get_environments(), new_environment()
 
 
 DEFAULT_ENVIRONMENT_YAML = """name: kernels

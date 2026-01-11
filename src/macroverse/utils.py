@@ -26,26 +26,31 @@ def process_routes(
         names = [v[1] for v in string.Formatter().parse(path) if v[1] is not None]
         src = path.format(**{name: "(.*)" for name in names})
         dst = path.format(**{name: f"${i + 1}" for i, name in enumerate(names)})
-        if route["methods"] == ["WEBSOCKET"]:
-            ws_redirects[src] = dst
+        methods = route["methods"]
+        if methods == ["WEBSOCKET"]:
+            ws_redirects[src] = (dst, methods)
         else:
-            http_redirects[src] = dst
+            http_redirects[src] = (dst, methods)
     redirects = []
-    for src, dst in ws_redirects.items():
+    for src, val in ws_redirects.items():
+        dst, methods = val
         redirects.append(
             NGINX_REDIRECT_WS.format(
                 uuid=uuid,
                 src=src,
                 dst=dst,
+                methods=methods,
                 environment_server_port=environment_server_port,
             )
         )
-    for src, dst in http_redirects.items():
+    for src, val in http_redirects.items():
+        dst, methods = val
         redirects.append(
             NGINX_REDIRECT_HTTP.format(
                 uuid=uuid,
                 src=src,
                 dst=dst,
+                methods=methods,
                 environment_server_port=environment_server_port,
             )
         )
@@ -53,6 +58,7 @@ def process_routes(
 
 
 NGINX_REDIRECT_HTTP = """
+    # redirect {methods} {src}
     location ~ ^/jupyverse/{uuid}{src} {{
         rewrite ^/jupyverse/{uuid}{src} {dst} break;
         proxy_pass http://localhost:{environment_server_port};
@@ -61,6 +67,7 @@ NGINX_REDIRECT_HTTP = """
 
 
 NGINX_REDIRECT_WS = """
+    # redirect {methods} {src}
     location ~ ^/jupyverse/{uuid}{src} {{
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;

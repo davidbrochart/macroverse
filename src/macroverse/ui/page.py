@@ -1,15 +1,20 @@
 from htmy import Component, html
 
-from .html import get_environments_and_create_button
+from .html import get_environments, get_servers, new_environment
 
 
 def page() -> Component:
     return html.div(
+        get_servers(),
         html.button(
-            "Refresh",
+            "New server",
             hx_swap="outerHTML",
-            hx_get="/macroverse/environments",
-            hx_target="#environments",
+            hx_put="/macroverse/create-server",
+            hx_target="#servers",
         ),
-        get_environments_and_create_button(),
+        html.div(
+            get_environments(),
+            new_environment(),
+            id="environments-new",
+        ),
     )

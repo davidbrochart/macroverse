@@ -20,7 +20,7 @@ def layout(children: ComponentType, context: Context) -> Component:
                     rel="stylesheet",
                     href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css",
                 ),
-                html.script(src="https://unpkg.com/htmx.org@2.0.7"),
+                html.script(src="https://unpkg.com/htmx.org@4.0.0-alpha6"),
             ),
             html.body(
                 html.main(children, class_="container"),

@@ -16,6 +16,7 @@ class Container(ABC):
     process: Process | None = None
     create_time: int | None = None
     nginx_conf: str | None = None
+    routes: list[dict[str, Any]] = field(default_factory=list)
 
     @classmethod
     @abstractmethod
