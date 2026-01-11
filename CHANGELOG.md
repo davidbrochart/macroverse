@@ -1,5 +1,11 @@
 # Version history
 
+## 0.5.0
+
+- Add servers, that connect to containers.
+- Update `htmx` v4.
+- Update `holm` v0.8.1.
+
 ## 0.4.0
 
 - Fall back to pure-Python PyYAML.
