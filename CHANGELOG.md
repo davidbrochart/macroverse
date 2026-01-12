@@ -1,5 +1,9 @@
 # Version history
 
+## 0.6.0
+
+- Remove environment in server when the environment is deleted.
+
 ## 0.5.0
 
 - Add servers, that connect to containers.
