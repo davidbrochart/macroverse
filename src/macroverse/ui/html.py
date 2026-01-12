@@ -4,6 +4,24 @@ from htmy import ComponentType, html
 from ..hub import Hub
 
 
+def get_servers_and_environments() -> ComponentType:
+    return html.div(
+        get_servers(),
+        html.button(
+            "New server",
+            hx_swap="outerHTML",
+            hx_put="/macroverse/create-server",
+            hx_target="#servers",
+        ),
+        html.div(
+            get_environments(),
+            new_environment(),
+            id="environments-new",
+        ),
+        id="servers-and-environments",
+    )
+
+
 def get_servers() -> ComponentType:
     with get_nowait(Hub) as hub:
         return html.table(
@@ -101,7 +119,7 @@ def get_environment(name: str) -> ComponentType:
                     "Delete",
                     hx_delete=f"/macroverse/environment/{name}/delete-environment",
                     hx_swap="outerHTML",
-                    hx_target="#environments",
+                    hx_target="#servers-and-environments",
                     style="background:red",
                 )
             )
