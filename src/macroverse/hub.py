@@ -72,7 +72,7 @@ class Hub:
     async def stop(self) -> None:
         async with create_task_group() as tg:
             for name in self.containers:
-                tg.start_soon(self.stop_container_server, name)
+                tg.start_soon(self.stop_container_server, name, False)
             for uuid in self.servers:
                 tg.start_soon(self.stop_server, uuid, False)
         try:
@@ -87,6 +87,13 @@ class Hub:
         self.servers[server.id] = server
         await self.write_nginx_conf()
         await run_process("nginx -s reload")
+
+    async def stop_server(self, uuid: str, reload_nginx: bool = True) -> None:
+        del self.servers[uuid]
+        logger.info(f"Stopping server: {uuid}")
+        await self.write_nginx_conf()
+        if reload_nginx:
+            await run_process("nginx -s reload")
 
     async def create_environment(self, environment_yaml: str) -> None:
         environment_dict = load(environment_yaml, Loader=Loader)
@@ -115,7 +122,7 @@ class Hub:
             container.create_time = None
             tg.cancel_scope.cancel()
 
-    async def start_environment_server(self, env_name: str) -> None:
+    async def start_container_server(self, env_name: str) -> None:
         async with self.server_lock:
             container = self.containers[env_name]
             if container.process is not None:
@@ -137,40 +144,25 @@ class Hub:
             container.port = port
             container.process = process
 
-    async def stop_server(self, uuid: str, reload_nginx: bool = True) -> None:
-        del self.servers[uuid]
-        logger.info(f"Stopping server: {uuid}")
-        await self.write_nginx_conf()
-        if reload_nginx:
-            await run_process("nginx -s reload")
-
-    async def stop_container_server(self, env_name: str) -> None:
-        container = self.containers[env_name]
-        if container.process is None:
-            return
-
-        logger.info(f"Stopping server for environment: {env_name}")
-        process = psutil.Process(container.process.pid)
-        children = process.children(recursive=True)
-        if children:
-            os.kill(children[0].pid, signal.SIGINT)
-        await container.process.wait()
-        container.process = None
-        container.port = None
-
     async def add_server_environment(self, uuid: str, env_name: str) -> None:
         if env_name in self.containers:
+            logger.info(f'Adding environment "{env_name}" in server: {uuid}')
             server = self.servers[uuid]
             server.environments.add(env_name)
-            await self.start_environment_server(env_name)
+            await self.start_container_server(env_name)
             server.create_nginx_conf(self.containers)
             await self.write_nginx_conf()
             await run_process("nginx -s reload")
 
     async def remove_server_environment(self, uuid: str, env_name: str) -> None:
-        self.servers[uuid].environments.remove(env_name)
+        logger.info(f'Removing environment "{env_name}" in server: {uuid}')
+        server = self.servers[uuid]
+        server.environments.remove(env_name)
+        server.create_nginx_conf(self.containers)
+        await self.write_nginx_conf()
+        await run_process("nginx -s reload")
 
-    async def stop_environment_server(
+    async def stop_container_server(
         self, env_name: str, reload_nginx: bool = True
     ) -> None:
         container = self.containers[env_name]
@@ -190,7 +182,12 @@ class Hub:
             await run_process("nginx -s reload")
 
     async def delete_environment(self, env_name: str) -> None:
-        await self.stop_environment_server(env_name)
+        for uuid, server in self.servers.items():
+            if env_name in server.environments:
+                logger.info(f'Removing environment "{env_name}" in server: {uuid}')
+                server.environments.remove(env_name)
+                server.create_nginx_conf(self.containers)
+        await self.stop_container_server(env_name)
         logger.info(f"Deleting environment: {env_name}")
         del self.containers[env_name]
         env_dir = Path("environments") / env_name

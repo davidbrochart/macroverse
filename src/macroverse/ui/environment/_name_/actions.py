@@ -3,7 +3,7 @@ from htmy import Component
 from holm import action
 
 
-from ...html import get_environment, get_environments
+from ...html import get_environment, get_servers_and_environments
 from ....hub import Hub
 
 
@@ -16,4 +16,4 @@ async def status(name: str) -> Component:
 async def delete_environment(name: str) -> Component:
     with get_nowait(Hub) as hub:
         await hub.delete_environment(name)
-        return get_environments()
+        return get_servers_and_environments()

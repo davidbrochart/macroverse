@@ -30,8 +30,9 @@ macroverse --open-browser
 
 This should open a browser window with a list of environments.
 Click on `New environment` and enter an `Environment YAML`.
-Click `Submit` and wait until the environment is created. Then click `Start server` next to your environment name.
-This should change the environment name into a link. If you click on it, this should open JupyterLab in a new tab.
+Click `Submit` and wait until the environment is created.
+Click on `New server` and then on `Add environment(s)`, and enter the name of the environment you just created.
+Then click on the link of the server. This should open JupyterLab in a new tab with the enabled environments.
 
 ### Docker containers
 
