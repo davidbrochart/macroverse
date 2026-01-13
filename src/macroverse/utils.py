@@ -1,6 +1,11 @@
+import re
 import string
 from socket import socket
 from typing import Any
+
+
+_remove_converter_pattern = re.compile(r":\w+}")
+_formatter = string.Formatter()
 
 
 def get_unused_tcp_ports(number: int) -> list[int]:
@@ -22,10 +27,12 @@ def process_routes(
     http_redirects = {}
     ws_redirects = {}
     for route in routes:
-        path = route["path"]
-        names = [v[1] for v in string.Formatter().parse(path) if v[1] is not None]
-        src = path.format(**{name: "(.*)" for name in names})
-        dst = path.format(**{name: f"${i + 1}" for i, name in enumerate(names)})
+        path = _remove_converter_pattern.sub("}", route["path"])
+        names = [v[1] for v in _formatter.parse(path) if v[1] is not None]
+        src = _formatter.vformat(path, [], {name: "(.*)" for name in names})
+        dst = _formatter.vformat(
+            path, [], {name: f"${i + 1}" for i, name in enumerate(names)}
+        )
         methods = route["methods"]
         if methods == ["WEBSOCKET"]:
             ws_redirects[src] = (dst, methods)
