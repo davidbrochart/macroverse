@@ -41,6 +41,8 @@ dependencies = [
   "fps-lab",
   "fps-frontend",
   "jupyverse-api",
+  "jupyter-collaboration-ui",
+  "jupyter-docprovider",
   "cyclopts >=4.4.3,<5.0.0",
   "holm >=0.8.1",
   "pyyaml >=6.0.3,<7.0.0",
