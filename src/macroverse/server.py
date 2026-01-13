@@ -43,5 +43,9 @@ NGINX_MAIN_JUPYVERSE_CONF = """
         rewrite ^/jupyverse/{uuid}/(.*)$ /jupyverse/$1 break;
         proxy_pass http://localhost:{macroverse_port};
         proxy_set_header X-Environment-ID {uuid};
+
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
     }}
 """
