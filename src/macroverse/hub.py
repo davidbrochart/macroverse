@@ -128,7 +128,7 @@ class Hub:
             if container.process is not None:
                 return
 
-            logger.info(f"Starting server for environment: {env_name}")
+            logger.info(f'Starting server for environment "{env_name}": {container.id}')
             port = get_unused_tcp_ports(1)[0]
             cmd = container.get_server_command(port)
             process = await open_process(cmd, stdout=None, stderr=None)
