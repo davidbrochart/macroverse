@@ -66,7 +66,7 @@ def process_routes(
 
 NGINX_REDIRECT_HTTP = """
     # redirect {methods} {src}
-    location ~ ^/jupyverse/{uuid}{src} {{
+    location ~ ^/jupyverse/{uuid}{src}$ {{
         rewrite ^/jupyverse/{uuid}{src} {dst} break;
         proxy_pass http://localhost:{environment_server_port};
     }}
@@ -75,7 +75,7 @@ NGINX_REDIRECT_HTTP = """
 
 NGINX_REDIRECT_WS = """
     # redirect {methods} {src}
-    location ~ ^/jupyverse/{uuid}{src} {{
+    location ~ ^/jupyverse/{uuid}{src}$ {{
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection $connection_upgrade;
