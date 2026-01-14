@@ -1,5 +1,9 @@
 # Version history
 
+## 0.6.1
+
+- Fix NGINX path matching.
+
 ## 0.6.0
 
 - Remove environment in server when the environment is deleted.
