@@ -29,7 +29,7 @@ classifiers = [
 ]
 
 dependencies = [
-  "fps[fastapi,anycorn] >=0.5.8,<0.6.0",
+  "fps[fastapi,anycorn] >=0.5.8,<0.7.0",
   "fps-auth",
   "fps-login",
   "fps-jupyterlab",
