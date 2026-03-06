@@ -7,8 +7,8 @@ from anyio import Event, create_task_group, sleep_forever
 from anyio.abc import TaskStatus
 from fastapi import Request
 from fps import Context, Module, get_nowait, get_root_module, put
-from jupyverse_api.auth import AuthConfig
-from jupyverse_api.lab import PageConfig
+from jupyverse_auth import AuthConfig
+from jupyverse_lab import PageConfig
 from fastapi import FastAPI
 from structlog import get_logger
 
@@ -61,6 +61,8 @@ class MacroverseModule(Module):
                 for name in [
                     "frontend",
                     "yjs",
+                    "yrooms",
+                    "ystore_sqlite",
                     "jupyterlab",
                     "file_id",
                     "nbconvert",
