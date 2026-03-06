@@ -41,7 +41,7 @@ class MacroverseModule(Module):
             port=self.macroverse_port,
         )
 
-    async def prepare(self):
+    async def prepare(self) -> None:
         async with create_task_group() as tg:
             root_app = await self.get(FastAPI)
             root_app.mount("/macroverse", macroverse_app)
@@ -56,7 +56,7 @@ class MacroverseModule(Module):
                     response = await call_next(request)
                     return response
 
-            jupyverse_modules = {
+            jupyverse_modules: dict[str, dict[str, Any]] = {
                 name: {"type": name}
                 for name in [
                     "frontend",
