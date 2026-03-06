@@ -7,8 +7,8 @@ from anyio import Event, create_task_group, sleep_forever
 from anyio.abc import TaskStatus
 from fastapi import Request
 from fps import Context, Module, get_nowait, get_root_module, put
-from jupyverse_api.auth import AuthConfig
-from jupyverse_api.lab import PageConfig
+from jupyverse_auth import AuthConfig
+from jupyverse_lab import PageConfig
 from fastapi import FastAPI
 from structlog import get_logger
 
@@ -41,7 +41,7 @@ class MacroverseModule(Module):
             port=self.macroverse_port,
         )
 
-    async def prepare(self):
+    async def prepare(self) -> None:
         async with create_task_group() as tg:
             root_app = await self.get(FastAPI)
             root_app.mount("/macroverse", macroverse_app)
@@ -56,11 +56,13 @@ class MacroverseModule(Module):
                     response = await call_next(request)
                     return response
 
-            jupyverse_modules = {
+            jupyverse_modules: dict[str, dict[str, Any]] = {
                 name: {"type": name}
                 for name in [
                     "frontend",
                     "yjs",
+                    "yrooms",
+                    "ystore_sqlite",
                     "jupyterlab",
                     "file_id",
                     "nbconvert",
