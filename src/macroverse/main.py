@@ -49,8 +49,10 @@ class MacroverseModule(Module):
         async with create_task_group() as tg:
             root_app = await self.get(FastAPI)
             root_app.mount("/macroverse", macroverse_app)
-            root_app.add_middleware(GZipMiddleware)
-            root_app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
+            root_app.add_middleware(GZipMiddleware)  # type: ignore[invalid-argument-type]
+            root_app.mount(
+                "/static", StaticFiles(directory=HERE / "static"), name="static"
+            )
             self.hub = Hub(tg, self.nginx_port, self.macroverse_port, self.container)
 
             @macroverse_app.middleware("http")

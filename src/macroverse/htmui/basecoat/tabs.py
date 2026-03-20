@@ -1,4 +1,11 @@
-from htmy import ComponentSequence, ComponentType, PropertyValue, SafeStr, html, join_classes
+from htmy import (
+    ComponentSequence,
+    ComponentType,
+    PropertyValue,
+    SafeStr,
+    html,
+    join_classes,
+)
 
 __version__ = "0.1.0"
 __framework__ = "BasecoatUI"
@@ -55,7 +62,9 @@ def tabs(
     **kwargs: PropertyValue,
 ) -> ComponentType:
     return html.div(
-        html.nav(*buttons, role="tablist", aria_orientation="horizontal", class_="w-full"),
+        html.nav(
+            *buttons, role="tablist", aria_orientation="horizontal", class_="w-full"
+        ),
         *panels,
         class_=join_classes("tabs w-full", class_),
         **kwargs,

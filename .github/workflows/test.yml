@@ -45,5 +45,10 @@ jobs:
     - name: Check types
       run: uv run ty check src
 
+    - name: Lint
+      run: |
+        uv run ruff check src
+        uv run ruff format --check src
+
     - name: Run CLI
       run: uv run macroverse --help

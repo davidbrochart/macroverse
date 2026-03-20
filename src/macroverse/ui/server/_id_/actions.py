@@ -41,7 +41,7 @@ async def edit_environments(id: str) -> Component:
         else:
             args["type"] = "checkbox"
         if environment_name in server.environments:
-            args["checked"] = True
+            args["checked"] = ""
         fields.append(
             html.label(
                 html.input_(**args),
@@ -89,7 +89,9 @@ async def edit_environments(id: str) -> Component:
 
 
 @action.put()
-async def environments(id: str, environment_names: Annotated[list[str], Form()]) -> Component:
+async def environments(
+    id: str, environment_names: Annotated[list[str], Form()]
+) -> Component:
     environment_names.remove("")
     with get_nowait(Hub) as hub:
         server = hub.servers[id]

@@ -37,7 +37,9 @@ def layout(children: ComponentType, context: Context) -> Component:
                         "bg-background isolate border-b",
                     ),
                     html.main(
-                        html.div(children, class_="mx-auto w-full flex-1 max-w-screen-md"),
+                        html.div(
+                            children, class_="mx-auto w-full flex-1 max-w-screen-md"
+                        ),
                         class_=(
                             "w-full max-w-screen-lg p-4 md:p-6 xl:p-12 mx-auto relative flex gap-10 grow"
                         ),
