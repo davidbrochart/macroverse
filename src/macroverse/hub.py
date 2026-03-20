@@ -231,4 +231,8 @@ server {{
     location /macroverse {{
         proxy_pass http://localhost:{macroverse_port};
     }}
+
+    location /static {{
+        proxy_pass http://localhost:{macroverse_port};
+    }}
 """
