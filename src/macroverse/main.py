@@ -1,11 +1,14 @@
 import webbrowser
 from collections.abc import Callable
 from functools import partial
+from pathlib import Path
 from typing import Any
 
 from anyio import Event, create_task_group, sleep_forever
 from anyio.abc import TaskStatus
 from fastapi import Request
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.staticfiles import StaticFiles
 from fps import Context, Module, get_nowait, get_root_module, put
 from jupyverse_auth import AuthConfig
 from jupyverse_lab import PageConfig
@@ -17,6 +20,7 @@ from .ui.main import macroverse_app
 from .utils import get_unused_tcp_ports
 
 
+HERE = Path(__file__).parent
 logger = get_logger()
 
 
@@ -45,6 +49,8 @@ class MacroverseModule(Module):
         async with create_task_group() as tg:
             root_app = await self.get(FastAPI)
             root_app.mount("/macroverse", macroverse_app)
+            root_app.add_middleware(GZipMiddleware)
+            root_app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
             self.hub = Hub(tg, self.nginx_port, self.macroverse_port, self.container)
 
             @macroverse_app.middleware("http")

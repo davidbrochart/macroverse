@@ -5,47 +5,50 @@ from fps import get_nowait
 from holm import action
 from htmy import Component, html
 
-from ..html import get_environments, new_environment
+from ..html import get_environments, create_environment
 from ...hub import Hub
 
 
 @action.get()
-async def edit() -> Component:
+async def edit_new() -> Component:
     return html.form(
         html.div(
-            html.label("Environment YAML"),
+            html.label("Environment YAML", for_="yaml-textarea"),
             html.textarea(
                 DEFAULT_ENVIRONMENT_YAML,
                 name="environment_yaml",
-                cols="64",
-                rows="6",
+                id="yaml-textarea",
             ),
-        ),
-        html.button(
-            "Submit",
-        ),
-        html.button(
-            "Cancel",
-            hx_get="/macroverse/environment/new",
-            hx_target="#edit-environment",
-            hx_swap="outerHTML",
+            html.button(
+                "Submit",
+                class_="btn w-40",
+            ),
+            html.button(
+                "Cancel",
+                hx_get="/macroverse/environment/new",
+                hx_target="#edit-new-environment",
+                hx_swap="outerHTML",
+                class_="btn-destructive w-40",
+            ),
+            class_="grid gap-2",
         ),
         hx_put="/macroverse/environment/create",
         hx_target="#environments-new",
-        id="edit-environment",
+        id="edit-new-environment",
+        class_="form grid gap-6",
     )
 
 
 @action.get()
 async def new() -> Component:
-    return new_environment()
+    return create_environment()
 
 
 @action.put()
 async def create(environment_yaml: Annotated[str, Form()]) -> Component:
     with get_nowait(Hub) as hub:
         await hub.create_environment(environment_yaml)
-        return get_environments(), new_environment()
+        return get_environments()
 
 
 DEFAULT_ENVIRONMENT_YAML = """name: kernels
