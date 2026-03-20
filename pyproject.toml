@@ -57,6 +57,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+  "ruff",
   "ty",
 ]
 
