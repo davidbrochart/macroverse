@@ -5,8 +5,8 @@ from fps import get_nowait
 from holm import action
 from htmy import Component, html
 
-from ...html import add_environment_button, get_servers, get_server
 from ....hub import Hub
+from ...html import add_environment_button, get_server, get_servers
 
 
 @action.get()
