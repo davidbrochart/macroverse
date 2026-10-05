@@ -1,6 +1,5 @@
-from htmy import Component, ComponentType, Context, SafeStr, component, html
-
 from holm import Metadata
+from htmy import Component, ComponentType, Context, SafeStr, component, html
 
 from ..htmui.basecoat import cdn as basecoat_cdn
 from ..htmui.basecoat import init_on_htmx_history_restore as basecoat_init
