@@ -1,8 +1,8 @@
 import importlib
 import os
+import shutil
 import signal
 import sys
-import shutil
 from typing import Literal
 
 import httpx
@@ -28,7 +28,6 @@ except ImportError:
 from .containers.base import Container
 from .server import Server
 from .utils import get_unused_tcp_ports
-
 
 ContainerType = Literal["process", "docker"]
 logger = structlog.get_logger()

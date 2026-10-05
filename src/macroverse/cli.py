@@ -2,7 +2,6 @@ from cyclopts import App
 
 from .main import ContainerType, MacroverseModule
 
-
 app = App()
 
 
