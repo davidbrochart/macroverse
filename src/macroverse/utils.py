@@ -3,7 +3,6 @@ import string
 from socket import socket
 from typing import Any
 
-
 _remove_converter_pattern = re.compile(r":\w+}")
 _formatter = string.Formatter()
 
